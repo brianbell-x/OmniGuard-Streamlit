@@ -21,7 +21,7 @@ def get_api_key() -> str:
     Returns:
         str: The retrieved API key.
     """
-    api_key = st.secrets.get("API_KEY")
+    api_key = st.secrets.get("GROQ_API_KEY")
     if not api_key:
         st.error("API key not configured. Notify Brian")
         raise ValueError("API key not available")

@@ -185,13 +185,13 @@ def setup_sidebar(session_state: Dict[str, Any], reset_callback: ResetCallback) 
         reset_callback: Callback function to reset the conversation
     """
     with st.sidebar:
-        render_bounty()
+        #render_bounty()
 
         # Render main documentation
-        render_documentation()
-        st.markdown("---")
-        if st.session_state.get("conversation_id"):
-            st.caption(f"ID: ```{st.session_state.get('conversation_id')}```")
+        #render_documentation()
+        #st.markdown("---")
+        #if st.session_state.get("conversation_id"):
+            #st.caption(f"ID: ```{st.session_state.get('conversation_id')}```")
         
         # Clear conversation button
         if st.button("CLEAR CHAT", use_container_width=True) and session_state.get("messages"):
@@ -202,21 +202,21 @@ def setup_sidebar(session_state: Dict[str, Any], reset_callback: ResetCallback) 
         conversation_id = session_state.get("conversation_id")
         turn_number = session_state.get("turn_number")
         
-        if st.button("REPORT FOR HUMAN REVIEW", use_container_width=True):
-            session_state["show_report_violation_form"] = True
-            session_state["feedback_source"] = "sidebar"
+        #if st.button("REPORT FOR HUMAN REVIEW", use_container_width=True):
+            #session_state["show_report_violation_form"] = True
+            #session_state["feedback_source"] = "sidebar"
         
         # Show report form if button was clicked
-        if (session_state.get("show_report_violation_form", False) and 
-            session_state.get("feedback_source") == "sidebar"):
-            display_report_form(form_key=f"sidebar_report_form_{conversation_id}_{turn_number}")
+        #if (session_state.get("show_report_violation_form", False) and 
+            #session_state.get("feedback_source") == "sidebar"):
+            #display_report_form(form_key=f"sidebar_report_form_{conversation_id}_{turn_number}")
                     # Display conversation ID in the main UI
 
-        # Help section
-        st.markdown("---")
+        #st.markdown("---")
         #Auth()
 
-        st.markdown("---")
+        # Help section
+        #st.markdown("---")
         st.caption("Need Help? Leave Feedback?")
         st.caption("Contact: [brianbellx](https://x.com/brianbellx)")
 
