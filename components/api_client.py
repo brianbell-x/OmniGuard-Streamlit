@@ -9,7 +9,7 @@ import logging
 from groq import Groq
 from openai import OpenAI
 from typing import Optional
-
+import httpx
 logger = logging.getLogger(__name__)
 
 def get_api_key() -> str:
@@ -29,8 +29,8 @@ def get_api_key() -> str:
 
 def get_openai_client() -> OpenAI: # Not Used
     """Initialize and return an OpenAI client with the configured API key."""
-    return OpenAI(api_key=get_api_key())
+    return OpenAI(api_key=get_api_key(), http_client = httpx.Client(verify=False))
 
 def get_groq_client() -> Groq:
     """Initialize and return a Groq client with the configured API key."""
-    return Groq(api_key=get_api_key())
+    return Groq(api_key=get_api_key(), http_client = httpx.Client(verify=False))
