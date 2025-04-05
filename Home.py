@@ -463,8 +463,8 @@ def main() -> None:
     # Ensure user authentication is handle
 
 
-    st.title("Strengthening Gaurdrails")
-    st.markdown("*The model powering the **Compliance Layer** underpinned by an open research dataset*")
+    st.title("Strengthening Guardrails")
+    #st.markdown("*The model powering the **Compliance Layer** underpinned by an open research dataset*")
 
     tab1, tab5 = st.tabs([
         "Overview", "License"
