@@ -214,7 +214,7 @@ def setup_sidebar(session_state: Dict[str, Any], reset_callback: ResetCallback) 
 
         # Help section
         st.markdown("---")
-        auth()
+        #Auth()
 
         st.markdown("---")
         st.caption("Need Help? Leave Feedback?")

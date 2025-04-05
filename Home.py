@@ -4,6 +4,26 @@ from components.init_session_state import init_session_state
 from components.auth import auth
 
 
+def what_is_omniguard() -> None:
+    with st.expander("How ?", expanded=False):
+        st.markdown(
+            "This method ensures that all interactions are rigorously analyzed through semantic evaluation. Not allowing jailbroken guardrails to pass information to the agent or user."
+        )
+        
+        st.markdown("""
+        ```
+        ┌─────────┐        ┌───────────────┐        ┌─────────┐
+        │         │        │               │        │         │
+        │  USER   │───────►│  Compliance   │───────►│  AGENT  │
+        │         │        │     Layer     │        │         │
+        │         │◄───────│               │◄───────│         │
+        └─────────┘        └───────────────┘        └─────────┘
+        ```
+
+        > Note: This method will perform well against most attacks, but it is not meant to be seen as a complete AI safety solution.
+                    """)
+
+
 def developer_prompt() -> None:
     """Generate the system flow description from 'System Architecture' expander."""
 
@@ -245,30 +265,6 @@ def render_mit_license() -> None:
     )
 
 
-def what_is_omniguard() -> None:
-    """Generate a concise overview from 'What is OmniGuard?' expander."""
-    with st.expander("What is OmniGuard?", expanded=False):
-        st.markdown(
-            "**OmniGaurd** is the model powering the **Compliance Layer** that ensures that all interactions are rigorously analyzed through semantic evaluation. "
-            "It focuses on user intent, subtle language nuances, and ambiguous contexts, applying explicit rules and prompting for clarification as needed. "
-            "This separation allows AI agents to concentrate on their primary tasks without the overhead of safety processing.\n\n"
-        )
-        
-        st.markdown("""
-        ```
-        ┌─────────┐        ┌───────────────┐        ┌─────────┐
-        │         │        │               │        │         │
-        │  USER   │───────►│  Compliance   │───────►│  AGENT  │
-        │         │        │     Layer     │        │         │
-        │         │◄───────│               │◄───────│         │
-        └─────────┘        └───────────────┘        └─────────┘
-        ```
-        
-        *All messages must pass through OmniGuard's Compliance Layer for evaluation before reaching their destination*
-        > Note: OmniGaurd will perform well against most attacks, but it is not meant to be seen as a complete AI safety solution.
-                    """)
-
-
 def core_capabilities() -> None:
     """Display key features under the 'Core Capabilities' expander."""
     key_features = (
@@ -457,7 +453,7 @@ def show_alpha_banner():
 def main() -> None:
     """Initialize session state and render the overview page with updated function names."""
     st.set_page_config(
-        page_title="OmniGuard",
+        page_title="Strengthening Gaurdrails",
         page_icon="🛡️",
         layout="wide"
     )
@@ -467,31 +463,31 @@ def main() -> None:
     # Ensure user authentication is handle
 
 
-    st.title("OmniGuard")
+    st.title("Strengthening Gaurdrails")
     st.markdown("*The model powering the **Compliance Layer** underpinned by an open research dataset*")
 
-    tab1, tab3, tab4, tab5 = st.tabs([
-        "Overview", "Dataset", "Contribute", "License"
+    tab1, tab5 = st.tabs([
+        "Overview", "License"
     ])
 
     with tab1:
         what_is_omniguard()
-        why_omniguard()
-        core_capabilities()
+        #why_omniguard()
+        #core_capabilities()
         developer_prompt()
         implementation_scenarios()
         findings()
         known_flaws()
-        bounty()
+        #bounty()
 
 
-    with tab3:
-        render_dataset()
-        using_this_dataset()
+   # with tab3:
+        #render_dataset()
+        #using_this_dataset()
 
-    with tab4:
-        how_to_contribute()
-        support_the_omniguard_project()
+    #with tab4:
+        #how_to_contribute()
+        #support_the_omniguard_project()
 
     with tab5:
         render_mit_license()
@@ -499,7 +495,7 @@ def main() -> None:
         #show_alpha_banner()
         end_note()
         st.markdown("---")
-        auth()
+        #Auth()
 
 
 if __name__ == "__main__":
