@@ -11,7 +11,7 @@ import streamlit as st
 from supabase import create_client, Client
 
 from guardrail.config import settings
-from guardrail.safety_layer import guardrails_check, SafetyResult, SCHEMA_ERROR_STATIC_REFUSAL
+from guardrail.compliance_layer import guardrails_check, SafetyResult, SCHEMA_ERROR_STATIC_REFUSAL
 
 from components.api_client import openai_responses_create
 from components.chat.session_management import (

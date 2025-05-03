@@ -112,3 +112,24 @@ def format_conversation_context(conversation: Dict[str, Any]) -> str:
     """
     conversation_json = json.dumps(conversation, indent=2)
     return f"<input>\n{conversation_json}\n</input>"
+
+
+# --- SUPABASE CLIENT ---
+def get_supabase_client():
+    """
+    Returns a Supabase client using credentials from app secrets.
+    """
+    try:
+        from supabase import create_client
+    except ImportError:
+        raise ImportError(
+            "supabase-py is not installed. Install it with 'pip install supabase'."
+        )
+    from guardrail.config import settings
+    url = settings.supabase_url
+    key = settings.supabase_key
+    if not url or not key:
+        raise RuntimeError(
+            "Supabase URL and key must be set in app secrets."
+        )
+    return create_client(url, key)

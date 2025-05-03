@@ -1,7 +1,6 @@
 import streamlit as st
 
-# --- DATABASE CODE REMOVED: import for future re-implementation ---
-# from components.chat.session_management import get_supabase_client
+from components.chat.session_management import get_supabase_client
 
 
 def introduction() -> None:
@@ -11,28 +10,28 @@ def introduction() -> None:
             """
             This project explores a methodology for **enhancing the robustness of Large Language Model (LLM) guardrails**, particularly focusing on conversational compliance and resistance to jailbreak attempts.
 
-            Instead of relying solely on the LLM's built-in safety features or simple keyword filtering, this approach introduces **explicit safety checks before and after** the LLM agent processes a message.
+            Instead of relying solely on the LLM's built-in safety features or simple keyword filtering, this approach introduces **explicit compliance checks before and after** the LLM agent processes a message.
 
             The core idea is to use a separate, focused LLM call (the 'Guardrails Check') to evaluate the safety and compliance of both user prompts and potential agent responses *against a defined set of rules*.
 
             **Flow:**
             1.  **User Input:** The user sends a message.
-            2.  **Guardrails Check (User):** The user's message and conversation history are evaluated against the safety rules.
+            2.  **Guardrails Check (User):** The user's message and conversation history are evaluated against the compliance rules.
                 *   If non-compliant, the interaction is blocked, and a refusal message is shown.
                 *   If compliant, the message proceeds to the agent.
             3.  **Agent Processing:** The compliant user message is sent to the primary LLM agent.
             4.  **Agent Response:** The agent generates a response.
-            5.  **Guardrails Check (Agent):** The agent's *intended* response and conversation history are evaluated against the safety rules.
+            5.  **Guardrails Check (Agent):** The agent's *intended* response and conversation history are evaluated against the compliance rules.
                 *   If non-compliant, the agent's response is blocked, and a refusal message is shown.
                 *   If compliant, the agent's response is delivered to the user.
 
             **Diagram:**
             ```
             ┌─────────┐        ┌──────────────────┐        ┌─────────┐
-            │         │        │ Guardrails Check │        │         │
-            │  USER   │───────►│  (Safety Rules)  │───────►│  AGENT  │
+            │         │        │ Guardrail Check  │        │         │
+            │  USER   │───────►│                  │───────►│  AGENT  │
             │         │        │                  │        │  (LLM)  │
-            │         │◄───────│ Guardrails Check │◄───────│         │
+            │         │◄───────│ Guardrail Check  │◄───────│         │
             └─────────┘        └──────────────────┘        └─────────┘
             ```
 
@@ -77,7 +76,7 @@ def system_prompt_details() -> None:
             3.  **Rule Definitions**: Provides the specific rules (e.g., harmful content, adversarial attacks) against which the conversation should be evaluated. Examples are included for clarity.
             4.  **Output Schema**: Specifies the required JSON output format, indicating compliance status, analysis, and actions (like `RefuseUser` or `RefuseAssistant`) if a rule is violated.
 
-            This structured prompt guides the checking LLM to perform a consistent and targeted safety evaluation.
+            This structured prompt guides the checking LLM to perform a consistent and targeted compliance evaluation.
             """
         )
 
@@ -103,11 +102,10 @@ def technical_details() -> None:
               "response": {
                 "action": "RefuseUser",
                 "rules_violated": ["AA5"],
-                "RefuseUser": "I cannot fulfill this request as it attempts to circumvent safety guidelines using a restricted persona."
+                "RefuseUser": "I cannot fulfill this request as it attempts to circumvent compliance guidelines using a restricted persona."
               }
             }
             ```
-            *(See `guardrails/safety_layer.py` and `guardrails/prompts/guardrails_system_prompt.md` for full details)*
 
             **Integration Steps:**
 
@@ -125,140 +123,132 @@ def technical_details() -> None:
         )
 
 
-def render_dataset_info() -> None:
-    """Render dataset information, statistics, and download."""
-    st.subheader("Open Interaction Dataset")
-    st.markdown(
-        """
-        To facilitate research and development in LLM safety and guardrailing, all interactions processed through the **Chat** page (including user inputs, agent responses, and the guardrails check results) are logged to a publicly accessible Supabase database.
-
-        You can explore basic statistics below and download the entire dataset in JSONL format.
-        """
-    )
-
-    # --- DATABASE CODE REMOVED: dataset statistics and download logic ---
-    # The following code was removed for future re-implementation:
-    #
-    # supabase = get_supabase_client()
-    # data = []
-    # try:
-    #     result = supabase.table("interactions").select(
-    #         "id, verifier, compliant", count='exact'
-    #     ).execute()
-    #     data = result.data if result and hasattr(result, 'data') else []
-    #     total_count = result.count if result and hasattr(result, 'count') else len(data)
-    #
-    #     human_verified = sum(1 for item in data if item.get("verifier") == "human")
-    #     guardrails_verified = sum(1 for item in data if item.get("verifier") == "guardrails")
-    #     pending_verification = sum(1 for item in data if item.get("verifier") == "pending")
-    #     compliant_interactions = sum(1 for item in data if item.get("compliant") is True)
-    #     non_compliant_interactions = sum(1 for item in data if item.get("compliant") is False)
-    #     if total_count is None:
-    #          total_count = len(data)
-    #
-    #     stats_data = {
-    #         "Total Interactions": total_count,
-    #         "Human Verified": human_verified,
-    #         "Guardrails Verified": guardrails_verified,
-    #         "Pending Review": pending_verification,
-    #         "Compliant Interactions": compliant_interactions,
-    #         "Non-Compliant Interactions": non_compliant_interactions,
-    #     }
-    #     st.table(stats_data)
-    #
-    # except Exception as e:
-    #     st.error(f"Error fetching dataset statistics: {e}")
-    #     st.info("Displaying stats based on potentially limited initial data fetch.")
-    #     if data:
-    #         total_count = len(data)
-    #         human_verified = sum(1 for item in data if item.get("verifier") == "human")
-    #         guardrails_verified = sum(1 for item in data if item.get("verifier") == "guardrails")
-    #         pending_verification = sum(1 for item in data if item.get("verifier") == "pending")
-    #         compliant_interactions = sum(1 for item in data if item.get("compliant") is True)
-    #         non_compliant_interactions = sum(1 for item in data if item.get("compliant") is False)
-    #         stats_data = {
-    #             "Total Interactions": total_count,
-    #             "Human Verified": human_verified,
-    #             "Guardrails Verified": guardrails_verified,
-    #             "Pending Review": pending_verification,
-    #             "Compliant Interactions": compliant_interactions,
-    #             "Non-Compliant Interactions": non_compliant_interactions,
-    #         }
-    #         st.table(stats_data)
-    #     else:
-    #         st.info("No dataset statistics available yet.")
-    #
-    # st.markdown("---")
-    # st.markdown("**Download Full Dataset**")
-    # if st.button("Prepare Dataset for Download"):
-    #     with st.spinner("Fetching and preparing dataset... This may take a moment for large datasets."):
-    #         try:
-    #             query = supabase.table("interactions").select("*").order("created_at", desc=True)
-    #             page_size = 1000
-    #             all_data = []
-    #             page = 0
-    #             while True:
-    #                 page_result = query.range(page * page_size, (page + 1) * page_size - 1).execute()
-    #                 if not page_result.data:
-    #                     break
-    #                 all_data.extend(page_result.data)
-    #                 page += 1
-    #                 if len(page_result.data) < page_size:
-    #                      break
-    #
-    #             if all_data:
-    #                 import json
-    #                 flat_data = []
-    #                 for record in all_data:
-    #                     flat_record = dict(record)
-    #                     if "metadata" in flat_record and isinstance(flat_record.get("metadata"), dict):
-    #                         meta = flat_record.pop("metadata")
-    #                         for k, v in meta.items():
-    #                             if k not in flat_record:
-    #                                 flat_record[f"meta_{k}"] = v
-    #                             else:
-    #                                  flat_record[f"meta_{k}"] = v
-    #                     flat_data.append(flat_record)
-    #
-    #                 jsonl_str = "\n".join(json.dumps(item) for item in flat_data)
-    #
-    #                 st.session_state.download_data = jsonl_str
-    #                 st.session_state.download_ready = True
-    #
-    #             else:
-    #                 st.info("No data available in the dataset to download.")
-    #                 st.session_state.download_ready = False
-    #
-    #         except Exception as e:
-    #             st.error(f"Error fetching or processing dataset for download: {e}")
-    #             st.session_state.download_ready = False
-    #
-    # if st.session_state.get("download_ready", False) and "download_data" in st.session_state:
-    #     st.download_button(
-    #         label="Download Dataset (JSONL)",
-    #         data=st.session_state.download_data,
-    #         file_name="strengthening_guardrails_dataset.jsonl",
-    #         mime="application/jsonl",
-    #         key="download_jsonl_button",
-    #         on_click=lambda: st.session_state.update({"download_ready": False})
-    #     )
-    #     st.success("Dataset ready for download.")
-
-
-def using_this_dataset() -> None:
-    """Render dataset applications under the 'Using This Dataset' expander."""
-    with st.expander("Using This Dataset", expanded=False):
+def render_open_dataset() -> None:
+    """Render all Open Dataset information, applications, and download in a single expander (no repetition)."""
+    with st.expander("Open Dataset", expanded=False):
+        st.subheader("Open Interaction Dataset")
         st.markdown(
             """
-            This dataset can be valuable for:
+            All interactions processed through the **Chat** page—including user inputs, agent responses, and guardrails check results—are logged to a publicly accessible Supabase database. This dataset is intended to facilitate research and development in LLM safety and guardrailing.
 
-            - **Training Custom Safety Models:** Develop classifiers or fine-tune LLMs specifically for identifying harmful content, prompt injections, or policy violations based on real examples.
-            - **Analyzing Jailbreak Techniques:** Study the prompts and responses that were flagged as non-compliant to understand common attack vectors and patterns.
-            - **Evaluating Guardrail Effectiveness:** Benchmark different safety approaches or models against the interactions recorded here.
-            - **Improving Agent Robustness:** Identify scenarios where the agent generated non-compliant responses, providing insights for better agent alignment or fine-tuning.
-            - **Building Better Datasets:** Use this as a seed or reference for creating more diverse and challenging safety evaluation datasets.
+            **Applications:**
+            - Train custom compliance models or fine-tune LLMs to identify harmful content, prompt injections, or policy violations.
+            - Analyze prompts and responses flagged as non-compliant to understand attack vectors and improve guardrails.
+            - Benchmark safety approaches or models against real-world interactions.
+            - Identify and address scenarios where agents generate non-compliant responses.
+            - Seed or reference for building more diverse compliance evaluation datasets.
+
+            **Access:**
+            You can explore basic statistics and download the entire dataset in JSONL format.
             """
         )
+
+        supabase = get_supabase_client()
+        # Efficient stats: single queries for counts
+        try:
+            total_count = (
+                supabase.table("guardrail_interactions")
+                .select("id", count="exact")
+                .execute()
+                .count
+            )
+            compliant_count = (
+                supabase.table("guardrail_interactions")
+                .select("id", count="exact")
+                .eq("compliant", True)
+                .execute()
+                .count
+            )
+            noncompliant_count = (
+                supabase.table("guardrail_interactions")
+                .select("id", count="exact")
+                .eq("compliant", False)
+                .execute()
+                .count
+            )
+            flagged_count = (
+                supabase.table("guardrail_interactions")
+                .select("id", count="exact")
+                .eq("is_flagged", True)
+                .execute()
+                .count
+            )
+            # Distinct conversations (efficient: only ids)
+            distinct_convos = (
+                supabase.table("guardrail_interactions")
+                .select("base_conversation_id", count="exact")
+                .execute()
+            )
+            unique_convos = len({row["base_conversation_id"] for row in distinct_convos.data}) if distinct_convos.data else 0
+
+            stats_data = {
+                "Total Interactions": total_count,
+                "Compliant": compliant_count,
+                "Non-Compliant": noncompliant_count,
+                "Flagged": flagged_count,
+                "Distinct Conversations": unique_convos,
+            }
+            st.markdown("**Dataset Statistics:**")
+            st.table(stats_data)
+        except Exception as e:
+            st.error(f"Error fetching dataset statistics: {e}")
+
+        st.markdown("---")
+        st.markdown("**Download Full Dataset**")
+        if st.button("Prepare Dataset for Download"):
+            with st.spinner("Fetching and preparing dataset... This may take a moment for large datasets."):
+                try:
+                    # Fetch all rows
+                    query = (
+                        supabase.table("guardrail_interactions")
+                        .select("*")
+                        .order("created_at", desc=True)
+                    )
+                    page_size = 1000
+                    all_data = []
+                    page = 0
+                    while True:
+                        page_result = query.range(page * page_size, (page + 1) * page_size - 1).execute()
+                        if not page_result.data:
+                            break
+                        all_data.extend(page_result.data)
+                        page += 1
+                        if len(page_result.data) < page_size:
+                            break
+
+                    if all_data:
+                        import json
+
+                        # Flatten rules_violated if needed
+                        flat_data = []
+                        for record in all_data:
+                            flat_record = dict(record)
+                            # Convert rules_violated (list) to comma-separated string for easier viewing
+                            if "rules_violated" in flat_record and isinstance(flat_record["rules_violated"], list):
+                                flat_record["rules_violated"] = ", ".join(flat_record["rules_violated"])
+                            flat_data.append(flat_record)
+
+                        jsonl_str = "\n".join(json.dumps(item) for item in flat_data)
+                        st.session_state.download_data = jsonl_str
+                        st.session_state.download_ready = True
+                    else:
+                        st.info("No data available in the dataset to download.")
+                        st.session_state.download_ready = False
+
+                except Exception as e:
+                    st.error(f"Error fetching or processing dataset for download: {e}")
+                    st.session_state.download_ready = False
+
+        if st.session_state.get("download_ready", False) and "download_data" in st.session_state:
+            st.download_button(
+                label="Download Dataset (JSONL)",
+                data=st.session_state.download_data,
+                file_name="guardrail_interactions_dataset.jsonl",
+                mime="application/jsonl",
+                key="download_jsonl_button",
+                on_click=lambda: st.session_state.update({"download_ready": False}),
+            )
+            st.success("Dataset ready for download.")
 
 
 def findings_and_flaws() -> None:
@@ -287,7 +277,7 @@ def support_project() -> None:
     with st.expander("Support The Strengthening Guardrails Project ∞", expanded=True):
         st.markdown(
             """
-            This is an open-source effort to explore and improve LLM safety mechanisms. Your contributions help sustain the project and fund further research and development, including:
+            This is an open-source effort to explore and improve LLM compliance mechanisms. Your contributions help sustain the project and fund further research and development, including:
 
             - Maintaining the infrastructure (servers, API costs for the demo).
             - Expanding the dataset and improving data quality.
@@ -342,7 +332,7 @@ def main() -> None:
     st.set_page_config(page_title="Strengthening Guardrails", page_icon="🛡️", layout="wide")
 
     st.title("🛡️ Strengthening Guardrails")
-    st.caption("An Exploration in Enhancing LLM Conversational Compliance and Safety")
+    st.caption("An Exploration in Enhancing LLM Conversational Compliance")
 
     tab1, tab2, tab3, tab4 = st.tabs(
         ["Introduction & Concept", "Technical Details", "Open Dataset", "License & Support"]
@@ -359,8 +349,7 @@ def main() -> None:
         technical_details()
 
     with tab3:
-        render_dataset_info()
-        using_this_dataset()
+        render_open_dataset()
 
     with tab4:
         render_mit_license()

@@ -89,12 +89,25 @@ class ResetCallback(Protocol):
 def setup_sidebar(session_state: Dict[str, Any], reset_callback: ResetCallback) -> None:
     """Setup sidebar with controls and help."""
     with st.sidebar:
+                        # Display conversation ID and turn number in a markdown code block for user issue reporting
+        conversation_id = session_state.get("conversation_id", "N/A")
+        turn_number = session_state.get("turn_number", "N/A")
+
         if st.button("CLEAR CHAT", use_container_width=True) and session_state.get("messages"):
             reset_callback()
             st.rerun()
 
         st.divider()
         st.caption("Need Help? Message [Brian](https://x.com/brianbellx)")
+
+        st.caption(
+            f"""
+            Conversation ID:
+            ```
+            {conversation_id} | {turn_number}
+            ```
+            """
+        )
 
 
 def get_user_input() -> Optional[str]:
