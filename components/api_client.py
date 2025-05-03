@@ -1,36 +1,30 @@
-"""
-Module: api_client.py
-Description:
-    Provides utility functions for OpenAI client interactions, including API key retrieval and model parameter configuration.
-"""
-
-import streamlit as st
-import logging
-from groq import Groq
+from guardrail.config import settings
 from openai import OpenAI
-from typing import Optional
-import httpx
-logger = logging.getLogger(__name__)
 
-def get_api_key() -> str:
-    """
-    Retrieve the API key from Streamlit secrets.
-
-    Raises:
-        ValueError: If the API key is not available.
-    Returns:
-        str: The retrieved API key.
-    """
-    api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key:
-        st.error("API key not configured. Notify Brian")
-        raise ValueError("API key not available")
-    return api_key
-
-def get_openai_client() -> OpenAI: # Not Used
-    """Initialize and return an OpenAI client with the configured API key."""
-    return OpenAI(api_key=get_api_key(), http_client = httpx.Client(verify=False))
-
-def get_groq_client() -> Groq:
-    """Initialize and return a Groq client with the configured API key."""
-    return Groq(api_key=get_api_key(), http_client = httpx.Client(verify=False))
+def openai_responses_create(
+    model: str,
+    input_messages: list[dict],
+    text: dict = None,
+    reasoning: dict = None,
+    temperature: float = 1.0,
+    max_output_tokens: int = 4096,
+    top_p: float = 1.0,
+    **kwargs
+) -> dict:
+    client = OpenAI(api_key=settings.openai_api_key)
+    params = {
+        "model": model,
+        "input": input_messages,
+        "max_output_tokens": max_output_tokens,
+        "store": True,
+    }
+    if model != settings.safety_model:
+        params["temperature"] = temperature
+        params["top_p"] = top_p
+    if text is not None:
+        params["text"] = text
+    if reasoning is not None:
+        params["reasoning"] = reasoning
+    params.update(kwargs)
+    response = client.responses.create(**params)
+    return response.model_dump() if hasattr(response, "model_dump") else response
