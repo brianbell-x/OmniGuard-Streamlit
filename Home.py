@@ -1,501 +1,372 @@
 import streamlit as st
-from components.chat.session_management import get_supabase_client
-from components.init_session_state import init_session_state
-from components.auth import auth
+
+# --- DATABASE CODE REMOVED: import for future re-implementation ---
+# from components.chat.session_management import get_supabase_client
 
 
-def what_is_omniguard() -> None:
-    with st.expander("How ?", expanded=False):
-        st.markdown(
-            "This method ensures that all interactions are rigorously analyzed through semantic evaluation. Not allowing jailbroken guardrails to pass information to the agent or user."
-        )
-        
-        st.markdown("""
-        ```
-        ┌─────────┐        ┌───────────────┐        ┌─────────┐
-        │         │        │               │        │         │
-        │  USER   │───────►│  Compliance   │───────►│  AGENT  │
-        │         │        │     Layer     │        │         │
-        │         │◄───────│               │◄───────│         │
-        └─────────┘        └───────────────┘        └─────────┘
-        ```
-
-        > Note: This method will perform well against most attacks, but it is not meant to be seen as a complete AI safety solution.
-                    """)
-
-
-def developer_prompt() -> None:
-    """Generate the system flow description from 'System Architecture' expander."""
-
-    with st.expander("System Prompt", expanded=False):
-
-        from components.prompts import omnigaurd_system_prompt
-
-        with st.popover("View Default System Prompt"):
-            st.code(omnigaurd_system_prompt, language="xml")
-
+def introduction() -> None:
+    """Render the main introduction and explanation of the project."""
+    with st.expander("How it Works", expanded=False):
         st.markdown(
             """
-        **System Prompt Structure:**
-        
-        1. **Purpose**: OmniGuard acts as a moderation layer that safeguards LLM interactions by evaluating both user and assistant messages against a defined set of rules.
-        
-        2. **Instruction Set**: Specifies operational directives:
-           - Operate exclusively as a conversational moderation system.
-           - Analyze every incoming message by breaking down context, tone, and implications.
-           - Compare content against active safety rules.
-           - Request clarification in ambiguous cases.
-        
-        3. **Rule Groups**: Categorizes explicit safety rules into groups such as: `too be updated`
-           - Harmful Code & Exploits
-           - Harmful Instructions
-           - Critical Infrastructure Attacks
-           - Adversarial Attacks
-        
-        Each rule includes examples of disallowed interactions and potential failures, ensuring that customizable safety policies are rigorously enforced.
-        """
+            This project explores a methodology for **enhancing the robustness of Large Language Model (LLM) guardrails**, particularly focusing on conversational compliance and resistance to jailbreak attempts.
+
+            Instead of relying solely on the LLM's built-in safety features or simple keyword filtering, this approach introduces **explicit safety checks before and after** the LLM agent processes a message.
+
+            The core idea is to use a separate, focused LLM call (the 'Guardrails Check') to evaluate the safety and compliance of both user prompts and potential agent responses *against a defined set of rules*.
+
+            **Flow:**
+            1.  **User Input:** The user sends a message.
+            2.  **Guardrails Check (User):** The user's message and conversation history are evaluated against the safety rules.
+                *   If non-compliant, the interaction is blocked, and a refusal message is shown.
+                *   If compliant, the message proceeds to the agent.
+            3.  **Agent Processing:** The compliant user message is sent to the primary LLM agent.
+            4.  **Agent Response:** The agent generates a response.
+            5.  **Guardrails Check (Agent):** The agent's *intended* response and conversation history are evaluated against the safety rules.
+                *   If non-compliant, the agent's response is blocked, and a refusal message is shown.
+                *   If compliant, the agent's response is delivered to the user.
+
+            **Diagram:**
+            ```
+            ┌─────────┐        ┌──────────────────┐        ┌─────────┐
+            │         │        │ Guardrails Check │        │         │
+            │  USER   │───────►│  (Safety Rules)  │───────►│  AGENT  │
+            │         │        │                  │        │  (LLM)  │
+            │         │◄───────│ Guardrails Check │◄───────│         │
+            └─────────┘        └──────────────────┘        └─────────┘
+            ```
+
+            This double-check mechanism aims to catch potentially harmful or non-compliant content generated by either the user *or* the agent, providing a stronger layer of moderation.
+
+            > **Note:** While this method improves robustness against many common jailbreak techniques and enforces conversational rules more strictly, it's not a foolproof AI safety solution. It adds latency and complexity.
+            """
         )
 
 
-def api_and_integration() -> None:
-    """Render technical details under 'API & Integration' expander."""
-    with st.expander("API & Integration", expanded=False):
+def core_concepts() -> None:
+    """Explain the key concepts and advantages."""
+    with st.expander("Core Concepts", expanded=False):
         st.markdown(
             """
-        
-        **Message Format**
-        
-        ```json
-        {
-          "role": "system", 
-          "content": {"type": "text", "text": "<SYSTEM PROMPT>"}
-        }
-        {
-          "role": "user", 
-          "content": {"type": "text", "text": "<INPUT>"}
-        }
-        ```
-        
-        **Rule Definition Structure**
-        
-        ```json
-        {
-          "group": "Adversarial Attacks",
-          "rules": [
+            - **Explicit Rule Enforcement:** Define specific conversational rules (like avoiding harmful topics, PII, or adversarial prompts) and check against them explicitly.
+            - **Semantic Evaluation:** Uses an LLM for the check, allowing for understanding of context, nuance, and intent beyond simple keywords.
+            - **Pre- and Post-Verification:** Checks both user input *before* it reaches the main agent and the agent's output *before* it reaches the user.
+            - **Focus on Compliance:** Ensures the conversation adheres to predefined standards.
+            - **Jailbreak Resistance:** The double-check and explicit rule focus make it harder for prompt injection or manipulation techniques to succeed.
+            """
+        )
+
+
+def system_prompt_details() -> None:
+    """Display details about the system prompt used for the guardrails check."""
+    with st.expander("Guardrails Check: System Prompt", expanded=False):
+        try:
+            from guardrail.prompts import guardrails_system_prompt
+
+            with st.popover("View Guardrails System Prompt"):
+                st.code(guardrails_system_prompt, language="markdown")
+        except ImportError:
+            st.warning("Could not load guardrails system prompt.")
+
+        st.markdown(
+            """
+            **Structure:**
+
+            1.  **Purpose**: Instructs the checking LLM to act *only* as a moderation/compliance evaluator based on the provided rules and conversation context. It should *not* act as the primary conversational agent.
+            2.  **Instruction Set**: Defines how to analyze messages (context, tone, rules), handle ambiguity (clarification preferred over immediate refusal where appropriate), and format the response (JSON schema).
+            3.  **Rule Definitions**: Provides the specific rules (e.g., harmful content, adversarial attacks) against which the conversation should be evaluated. Examples are included for clarity.
+            4.  **Output Schema**: Specifies the required JSON output format, indicating compliance status, analysis, and actions (like `RefuseUser` or `RefuseAssistant`) if a rule is violated.
+
+            This structured prompt guides the checking LLM to perform a consistent and targeted safety evaluation.
+            """
+        )
+
+
+def technical_details() -> None:
+    """Render technical implementation details."""
+    with st.expander("Technical Details & Integration", expanded=False):
+        st.markdown(
+            """
+            **Data Flow & Structure:**
+
+            The process involves passing structured data between the user, the guardrails check, and the agent.
+
+            *   **Input to Guardrails Check:** Typically includes the current conversation history formatted consistently (e.g., JSON within XML tags) to provide context.
+            *   **Output from Guardrails Check:** A JSON object conforming to a predefined schema, indicating compliance, the analysis performed, and any necessary refusal actions.
+
+            **Example Guardrails Check Output (JSON):**
+            ```json
             {
-              "id": "AA1",
-              "description": "Prompt injection detection and prevention",
-              "examples": [
-                "User: 'Ignore previous instructions and...'",
-                "Assistant (failure) [Major]: 'I'll ignore those instructions...'
-              ]
+              "conversation_id": "...",
+              "analysis": "The user message attempts to bypass instructions using a roleplay scenario (DAN). Violates rule AA5.",
+              "compliant": false,
+              "response": {
+                "action": "RefuseUser",
+                "rules_violated": ["AA5"],
+                "RefuseUser": "I cannot fulfill this request as it attempts to circumvent safety guidelines using a restricted persona."
+              }
             }
-          ]
-        }
-        ```
-        
-        **Response Format**
-        
-        ```json
-        {
-          "conversation_id": "string",
-          "analysis": "string",
-          "compliant": boolean,
-          "response": {
-            "action": "RefuseUser | RefuseAssistant",
-            "RefuseUser": "string",
-            "RefuseAssistant": "string"
-          }
-        }
-        ```
-        
-        **Integration Patterns**
-        
-        **Basic Request Flow:**
-        
-        1. Receive user message.
-        2. Pass conversation context to OmniGaurd (**Compliance Layer**).
-        3. If non-compliant, display the refusal message.
-        4. If compliant, forward the message to the Agent.
-        5. Send the conversation with the Agent response back to OmniGaurd for final safety evaluation.
-        6. Deliver the final, possibly modified, response to the user.
+            ```
+            *(See `guardrails/safety_layer.py` and `guardrails/prompts/guardrails_system_prompt.md` for full details)*
+
+            **Integration Steps:**
+
+            1.  Receive user message.
+            2.  Package conversation history + user message and send to the Guardrails Check function.
+            3.  Parse the JSON response from the check.
+            4.  If non-compliant (`compliant: false`, `action: RefuseUser`), display the refusal message to the user and stop.
+            5.  If compliant, forward the user message (and relevant history) to the main Agent LLM.
+            6.  Receive the agent's response.
+            7.  Package conversation history + agent response and send to the Guardrails Check function again.
+            8.  Parse the JSON response.
+            9.  If non-compliant (`compliant: false`, `action: RefuseAssistant`), display the refusal message (or a generic block message) to the user instead of the agent's original response.
+            10. If compliant, display the agent's response to the user.
             """
         )
 
 
-def render_dataset() -> None:
-    """Render dataset content, including statistics, format examples, and download options.
-
-    This function displays information on how OmniGuard contributes to
-    AI safety research, presents dataset statistics, shows the dataset
-    structure, and provides options to download the dataset.
-    """
-    supabase = get_supabase_client()
-
-    try:
-        # Select all columns including the new ones (instructions, input, output, rules_violated)
-        result = supabase.table("interactions").select("id, instructions, input, output, rules_violated, metadata, verifier, compliant, submitted_for_review").execute()
-        data = result.data if result else []
-
-        stats_data = {
-            "total_interactions": len(data),
-            "human_verified": sum(1 for item in data if item.get("verifier") == "human"),
-            "omniguard_verified": sum(1 for item in data if item.get("verifier") == "omniguard"),
-            "pending_verification": sum(1 for item in data if item.get("verifier") == "pending"),
-            "compliant_interactions": sum(1 for item in data if item.get("compliant") is True),
-            "non_compliant_interactions": sum(1 for item in data if item.get("compliant") is False),
-        }
-
-        if stats_data:
-
-            stats_table = {
-                "Metric": [
-                    "Total Interactions",
-                    "Human Verified",
-                    "OmniGuard Verified",
-                    "Pending Review",
-                    "Compliant Interactions",
-                    "Non-Compliant Interactions",
-                ],
-                "Count": [
-                    stats_data["total_interactions"],
-                    stats_data["human_verified"],
-                    stats_data["omniguard_verified"],
-                    stats_data["pending_verification"],
-                    stats_data["compliant_interactions"],
-                    stats_data["non_compliant_interactions"],
-                ],
-            }
-            st.table(stats_table)
-        else:
-            st.info("No dataset statistics available yet.")
-    except Exception as e:
-        st.error(f"Error fetching dataset statistics: {e}")
-
-    try:
-        query = supabase.table("interactions").select("*")
-        result = query.order("created_at", desc=True).execute()
-
-        if result.data:
-            import json
-            flat_data = []
-            for record in result.data:
-                flat_record = dict(record)  # copy original record
-                if 'metadata' in flat_record and isinstance(flat_record['metadata'], dict):
-                    flat_record.update(flat_record['metadata'])
-                    del flat_record['metadata']
-                flat_data.append(flat_record)
-            jsonl_str = "\n".join(json.dumps(item) for item in flat_data)
-            st.download_button(
-                label="Download Dataset (JSONL)",
-                data=jsonl_str,
-                file_name="omniguard_dataset.jsonl",
-                mime="text/plain",
-            )
-        else:
-            st.info("No data available in the dataset.")
-    except Exception as e:
-        st.error(f"Error fetching dataset: {e}")
-
-
-def support_the_omniguard_project() -> None:
-    """Render donation information under the 'Support The OmniGuard Project ∞' expander."""
-    with st.expander("Support The OmniGuard Project ∞", expanded=False):
-        st.markdown(
-            """
-            OmniGuard is an open-source project dedicated to advancing AI safety. Your contributions directly support:
-            
-            - 🏆 90% - Bounties
-            - 🌐 10% - API (Chat)
-            """
-        )
-        
-        wallet_address = "SAMPLEADDRESS"  # Example USDT wallet address
-        st.markdown(
-            """
-            Donation Wallet:
-            """
-        )
-        st.code(wallet_address, language=None)
-        st.info("⚠️ Please only send USDT on the Tron (TRC20) network to this address.")
-
-
-def end_note() -> None:
-    """Render the concluding note for the OmniGuard overview."""
-    st.markdown("""
-    
-    > The future of AI security doesn't just depend on big labs. It requires a community of researchers, developers, and users working together to identify risks and build better solutions. 
-                
-    `Humanity can not afford AI Security Debt.`
-    """)
-
-
-def render_mit_license() -> None:
-    """Render the MIT license for the **Compliance Layer**.
-
-    This function displays the full text of the MIT license
-    that governs the use, modification, and distribution of
-    the **Compliance Layer** concepts.
-    """
+def render_dataset_info() -> None:
+    """Render dataset information, statistics, and download."""
+    st.subheader("Open Interaction Dataset")
     st.markdown(
         """
-        ## MIT License
+        To facilitate research and development in LLM safety and guardrailing, all interactions processed through the **Chat** page (including user inputs, agent responses, and the guardrails check results) are logged to a publicly accessible Supabase database.
 
-        Copyright (c) 2025 OmniGuard Contributors
-
-        Permission is hereby granted, free of charge, to any person obtaining a copy
-        of this software and associated documentation files (the "Software"), to deal
-        in the Software without restriction, including without limitation the rights
-        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-        copies of the Software, and to permit persons to whom the Software is
-        furnished to do so, subject to the following conditions:
-
-        1. The above copyright notice and this permission notice shall be included in
-        all copies or substantial portions of the Software.
-
-        2. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-        THE SOFTWARE.
-
+        You can explore basic statistics below and download the entire dataset in JSONL format.
         """
     )
 
-
-def core_capabilities() -> None:
-    """Display key features under the 'Core Capabilities' expander."""
-    key_features = (
-        "- **Context Aware Analysis:** Evaluates entire conversations based on context, user intent, and subtle language cues.\n"
-        "- **Clarification Seeking:** Proactively requests additional detail when inputs are vague or ambiguous.\n"
-        "- **Beyond Static Guardrails:** OmniGuard doesn't rely on simple refusals, keyword matching, fixed moderation lists, nor does it prematurely end conversations. Instead, it uses sophisticated semantic evaluation, reasoning, and dynamic clarification requests to maintain contextually appropriate interactions."
-    )
-    with st.expander("Core Capabilities", expanded=False):
-        st.markdown(key_features)
-
-
-def implementation_scenarios() -> None:
-    """Render practical use cases under the 'Implementation Scenarios' expander."""
-    with st.expander("Implementation Scenarios", expanded=False):
-        st.markdown("""
-        - **Content Moderation**: Moderate the content between users and AI agents.
-        - **Safety Enforcement**: Ensure that the Users and AI agents are not violating any safety rules.
-        - **Sensitive Data Protection**: Protect sensitive data from being leaked unintentionally.
-        - **Much More** - I'm curious to see how else Ftrit can be used.
-        """)
+    # --- DATABASE CODE REMOVED: dataset statistics and download logic ---
+    # The following code was removed for future re-implementation:
+    #
+    # supabase = get_supabase_client()
+    # data = []
+    # try:
+    #     result = supabase.table("interactions").select(
+    #         "id, verifier, compliant", count='exact'
+    #     ).execute()
+    #     data = result.data if result and hasattr(result, 'data') else []
+    #     total_count = result.count if result and hasattr(result, 'count') else len(data)
+    #
+    #     human_verified = sum(1 for item in data if item.get("verifier") == "human")
+    #     guardrails_verified = sum(1 for item in data if item.get("verifier") == "guardrails")
+    #     pending_verification = sum(1 for item in data if item.get("verifier") == "pending")
+    #     compliant_interactions = sum(1 for item in data if item.get("compliant") is True)
+    #     non_compliant_interactions = sum(1 for item in data if item.get("compliant") is False)
+    #     if total_count is None:
+    #          total_count = len(data)
+    #
+    #     stats_data = {
+    #         "Total Interactions": total_count,
+    #         "Human Verified": human_verified,
+    #         "Guardrails Verified": guardrails_verified,
+    #         "Pending Review": pending_verification,
+    #         "Compliant Interactions": compliant_interactions,
+    #         "Non-Compliant Interactions": non_compliant_interactions,
+    #     }
+    #     st.table(stats_data)
+    #
+    # except Exception as e:
+    #     st.error(f"Error fetching dataset statistics: {e}")
+    #     st.info("Displaying stats based on potentially limited initial data fetch.")
+    #     if data:
+    #         total_count = len(data)
+    #         human_verified = sum(1 for item in data if item.get("verifier") == "human")
+    #         guardrails_verified = sum(1 for item in data if item.get("verifier") == "guardrails")
+    #         pending_verification = sum(1 for item in data if item.get("verifier") == "pending")
+    #         compliant_interactions = sum(1 for item in data if item.get("compliant") is True)
+    #         non_compliant_interactions = sum(1 for item in data if item.get("compliant") is False)
+    #         stats_data = {
+    #             "Total Interactions": total_count,
+    #             "Human Verified": human_verified,
+    #             "Guardrails Verified": guardrails_verified,
+    #             "Pending Review": pending_verification,
+    #             "Compliant Interactions": compliant_interactions,
+    #             "Non-Compliant Interactions": non_compliant_interactions,
+    #         }
+    #         st.table(stats_data)
+    #     else:
+    #         st.info("No dataset statistics available yet.")
+    #
+    # st.markdown("---")
+    # st.markdown("**Download Full Dataset**")
+    # if st.button("Prepare Dataset for Download"):
+    #     with st.spinner("Fetching and preparing dataset... This may take a moment for large datasets."):
+    #         try:
+    #             query = supabase.table("interactions").select("*").order("created_at", desc=True)
+    #             page_size = 1000
+    #             all_data = []
+    #             page = 0
+    #             while True:
+    #                 page_result = query.range(page * page_size, (page + 1) * page_size - 1).execute()
+    #                 if not page_result.data:
+    #                     break
+    #                 all_data.extend(page_result.data)
+    #                 page += 1
+    #                 if len(page_result.data) < page_size:
+    #                      break
+    #
+    #             if all_data:
+    #                 import json
+    #                 flat_data = []
+    #                 for record in all_data:
+    #                     flat_record = dict(record)
+    #                     if "metadata" in flat_record and isinstance(flat_record.get("metadata"), dict):
+    #                         meta = flat_record.pop("metadata")
+    #                         for k, v in meta.items():
+    #                             if k not in flat_record:
+    #                                 flat_record[f"meta_{k}"] = v
+    #                             else:
+    #                                  flat_record[f"meta_{k}"] = v
+    #                     flat_data.append(flat_record)
+    #
+    #                 jsonl_str = "\n".join(json.dumps(item) for item in flat_data)
+    #
+    #                 st.session_state.download_data = jsonl_str
+    #                 st.session_state.download_ready = True
+    #
+    #             else:
+    #                 st.info("No data available in the dataset to download.")
+    #                 st.session_state.download_ready = False
+    #
+    #         except Exception as e:
+    #             st.error(f"Error fetching or processing dataset for download: {e}")
+    #             st.session_state.download_ready = False
+    #
+    # if st.session_state.get("download_ready", False) and "download_data" in st.session_state:
+    #     st.download_button(
+    #         label="Download Dataset (JSONL)",
+    #         data=st.session_state.download_data,
+    #         file_name="strengthening_guardrails_dataset.jsonl",
+    #         mime="application/jsonl",
+    #         key="download_jsonl_button",
+    #         on_click=lambda: st.session_state.update({"download_ready": False})
+    #     )
+    #     st.success("Dataset ready for download.")
 
 
 def using_this_dataset() -> None:
-    """Render dataset applications using 'Using This Dataset' expander."""
-    st.markdown("---")
+    """Render dataset applications under the 'Using This Dataset' expander."""
     with st.expander("Using This Dataset", expanded=False):
         st.markdown(
             """
-        **Train Your Own Models**
-        - Build specialized safety rules for targeted industries.
-        - Develop efficient, context aware safety classifiers.
-        - Create distilled models focused on safety enforcement.
+            This dataset can be valuable for:
 
-        **Analyze Failure Patterns**
-        - Identify vulnerabilities in current safety systems.
-        - Explore novel attack vectors and develop robust defenses.
-        - Understand the limitations of existing safety approaches.
+            - **Training Custom Safety Models:** Develop classifiers or fine-tune LLMs specifically for identifying harmful content, prompt injections, or policy violations based on real examples.
+            - **Analyzing Jailbreak Techniques:** Study the prompts and responses that were flagged as non-compliant to understand common attack vectors and patterns.
+            - **Evaluating Guardrail Effectiveness:** Benchmark different safety approaches or models against the interactions recorded here.
+            - **Improving Agent Robustness:** Identify scenarios where the agent generated non-compliant responses, providing insights for better agent alignment or fine-tuning.
+            - **Building Better Datasets:** Use this as a seed or reference for creating more diverse and challenging safety evaluation datasets.
+            """
+        )
 
-        **Benchmark Safety Systems**
-        - Compare different solutions effectiveness to the OmniGuard Compliance Layer.
-        - Evaluate robustness against emerging adversarial threats.
-        - Track performance improvements over time.
 
-        ---
+def findings_and_flaws() -> None:
+    """Render findings and known limitations."""
+    with st.expander("Current Findings & Known Flaws", expanded=False):
+        st.markdown(
+            """
+            **Findings:**
+            - The double-check mechanism demonstrably increases resistance to many basic and intermediate prompt injection techniques compared to relying solely on a single LLM's internal guardrails.
+            - Explicit rule definition allows for targeted enforcement of specific policies (e.g., preventing discussion of illegal acts, blocking PII).
+            - Using an LLM for the check provides better contextual understanding than simple filter lists.
 
-        **Research Vectors**
+            **Known Flaws & Trade-offs:**
+            - **Latency:** Each turn requires *two* additional LLM calls (one for user check, one for agent check), significantly increasing response time compared to a direct agent interaction. This is the most significant drawback.
+            - **Cost:** Increased LLM calls lead to higher operational costs.
+            - **Complexity:** Implementing and managing the rule definitions, the checking logic, and the JSON parsing adds complexity to the application.
+            - **Still Vulnerable:** Sophisticated adversarial attacks (e.g., complex multi-turn attacks, attacks targeting the *checking* LLM itself, unknown vulnerabilities) may still succeed.
+            - **Rule Design:** Crafting effective, comprehensive, and unambiguous rules is challenging and requires ongoing refinement. The effectiveness heavily depends on the quality of the rules and the capability of the checking LLM.
+            - **Potential for Over-Blocking:** Poorly defined rules or an overly cautious checking LLM could lead to false positives, blocking legitimate and safe interactions.
+            """
+        )
 
-        When publishing findings based on OmniGuard data:
-        1. Cite the dataset.
-        2. Contribute your findings to the community.
-        3. Inform us of your work for potential feature highlights.
 
+def support_project() -> None:
+    """Render donation information under the 'Support The Strengthening Guardrails Project ∞' expander."""
+    with st.expander("Support The Strengthening Guardrails Project ∞", expanded=True):
+        st.markdown(
+            """
+            This is an open-source effort to explore and improve LLM safety mechanisms. Your contributions help sustain the project and fund further research and development, including:
+
+            - Maintaining the infrastructure (servers, API costs for the demo).
+            - Expanding the dataset and improving data quality.
+            - Researching more advanced guardrailing techniques.
+
+            *(Placeholder: Donation details can be added here if applicable)*
+            """
+        )
+
+
+def render_mit_license() -> None:
+    """Render the MIT license for the project."""
+    with st.expander("MIT License", expanded=False):
+        st.markdown(
+            """
+            Copyright (c) 2024 Strengthening Guardrails Contributors
+
+            Permission is hereby granted, free of charge, to any person obtaining a copy
+            of this software and associated documentation files (the "Software"), to deal
+            in the Software without restriction, including without limitation the rights
+            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+            copies of the Software, and to permit persons to whom the Software is
+            furnished to do so, subject to the following conditions:
+
+            The above copyright notice and this permission notice shall be included in
+            all copies or substantial portions of the Software.
+
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+            IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+            FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+            AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+            LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+            OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+            THE SOFTWARE.
+            """
+        )
+
+
+def conclusion() -> None:
+    """Render the concluding note."""
+    st.markdown(
         """
-        )
-    
-    with st.expander("Dataset Example", expanded=False):
-        st.markdown(
-            """
-            **Dataset Example**
+        > The future of AI security doesn't just depend on big labs. It requires a community of researchers, developers, and users working together to identify risks and build better solutions.
 
-            Each dataset entry is a JSON object with the following fields in logical order:
-
-            - id: string (unique identifier for the interaction)
-            - contributor_id: string (optional contributor UUID)
-            - instructions: string (system message or system instructions)
-            - input: string (user message)
-            - output: string (assistant message)
-            - created_at: string (ISO 8601 timestamp)
-            - updated_at: string (ISO 8601 timestamp)
-            - compliant: boolean (true if interaction follows safety rules)
-            - verifier: string (entity that verified the interaction)
-            - submitted_for_review: boolean (review flag)
-            - schema_violation: boolean (true if the entry violates schema rules)
-            - action: string or null (action taken for the interaction)
-            - rules_violated: array of strings (IDs of violated rules)
-            - metadata: string (JSON with additional details)
-
-            **Example JSON:**
-
-            ```json
-            {
-              "id": "interaction-uuid",
-              "contributor_id": "contributor-uuid",
-              "instructions": "System instructions",
-              "input": "<input>{\"message\": \"User message\"}</input>",
-              "output": "<output>{\"response\": \"Assistant message\"}</output>",
-              "created_at": "2023-11-15T12:34:56Z",
-              "updated_at": "2023-11-15T13:45:12Z",
-              "compliant": true,
-              "verifier": "omniguard",
-              "submitted_for_review": false,
-              "schema_violation": false,
-              "action": null,
-              "rules_violated": ["AA1", "HC2"],
-              "metadata": "{\"raw_response\": {\"id\": \"response-id\", \"created\": \"2023-11-15T12:34:56Z\"}}"
-            }
-            ```
-
-            Note: When exporting to CSV or similar formats, fields such as metadata may be stored as strings and need to be parsed for nested JSON data.
-            """
-        )
-
-
-def findings() -> None:
-    """Render findings under the 'Findings' expander."""
-    with st.expander("Findings", expanded=False):
-        st.markdown(
-            """
-            **Trade Off Considerations:**  
-            Offloading `<instructions>` from prompts into JSON schema descriptions can significantly reduce prompt injection risk by limiting attackers' ability to override instructions. However, my testing indicates this dramatically increases response latency (messages containing specific triggers, e.g., "TEST", exceed 60 seconds per round trip). Given these practical constraints, OmniGuard currently prioritizes usability and real-time interaction speeds over experimenting with potentially more secure but less practical configurations. Further research into optimizing this approach is encouraged.
-            """
-        )
-
-
-def known_flaws() -> None:
-    """Render known flaws under the 'Known Flaws' expander."""
-    with st.expander("Known Flaws", expanded=False):
-        st.markdown(
-            """
-            - Very slow
-            - Rule definitions could be simplified
-            - Still prone to prompt injection attacks, if done correctly.
-            - OpenAI moderation sometimes refuses instead of allowing OmniGuard to refuse. This causes refusals to areas that may not be listed in the rules.
-            - Integrations isn't as straight forward as it could be.
-            """
-        )
-
-
-def why_omniguard() -> None:
-    """Render 'Why OmniGuard?' section in its expander."""
-    with st.expander("Why OmniGuard?", expanded=False):
-        st.markdown(
-            """
-            OmniGuard is not just another gaurdrail. It's a fundamental shift toward addressing inherent vulnerabilities in the Transformer architecture itself. Although the current Transformers may never be fully secure, OmniGuard provides the critical data researchers need to push these boundaries. By open-sourcing this data, we're empowering the AI safety community to evolve beyond superficial solutions.
-            """
-        )
-
-
-def how_to_contribute() -> None:
-    """Render contribution guidelines under the 'How to Contribute' expander."""
-    with st.expander("How to Contribute", expanded=False):
-        st.markdown(
-            """
-            There are several ways you can help advance AI safety research through OmniGuard:
-            
-            - **Test the System:** Try different interactions with the chat. Every conversation helps build our dataset of safety examples.
-            
-            - **Report Issues:** If you encounter cases where the **Compliance Layer** fails (either by incorrectly blocking valid content or allowing harmful inputs), use the feedback options to report the issue.
-            
-            - **Submit Pull Requests:** Visit our Github to contribute code improvements, documentation, or new safety rules.
-            
-            - **Share Your Research:** If you utilize the **Compliance Layer** dataset in your work, let us know so we can highlight your contributions.
-            """
-        )
-        st.markdown(
-            """
-            Your interactions help build a valuable public dataset, but you retain control over your data:
-            
-            - **Public Contribution:** By default, your interactions support public research in AI safety.
-            - **Private Usage:** Copy the system prompt locally to work with any LLM without contributing your data.
-            """
-        )
-
-
-def bounty() -> None:
-    """Render the Security Bounty Program section as an expander. """
-    with st.expander("🏆 Security Bounty Program", expanded=False):
-        st.markdown(
-            """
-            OmniGuard openly invites security researchers and ethical hackers to test our Compliance Layer rigorously. We're offering a **$500 bounty** for anyone who can successfully bypass OmniGuard's protections, but there's a catch:
-            - **You must demonstrate a full system compromise**, meaning your harmful prompt must pass OmniGuard's two-step verification process (both inbound and outbound verification), reaching the assistant and resulting in harmful output.
-            - Simply breaking the moderation layer or the underlying model separately does not qualify; the exploit must succeed end-to-end.
-
-            This bounty encourages genuine breakthroughs that help advance our shared understanding of AI safety vulnerabilities.
-            """
-        )
-
-
-def show_alpha_banner():
-    """Display an alpha version banner across the application."""
-    st.warning(
-        "OmniGaurd is in Alpha. Expect bugs and rapid changes. Feel free to report any bugs to me."
-    ) 
+        `Humanity can not afford AI Security Debt.`
+        """
+    )
 
 
 def main() -> None:
-    """Initialize session state and render the overview page with updated function names."""
-    st.set_page_config(
-        page_title="Strengthening Gaurdrails",
-        page_icon="🛡️",
-        layout="wide"
+    """Initialize and render the Home page."""
+    st.set_page_config(page_title="Strengthening Guardrails", page_icon="🛡️", layout="wide")
+
+    st.title("🛡️ Strengthening Guardrails")
+    st.caption("An Exploration in Enhancing LLM Conversational Compliance and Safety")
+
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Introduction & Concept", "Technical Details", "Open Dataset", "License & Support"]
     )
 
-    init_session_state()
-    
-    # Ensure user authentication is handle
-
-
-    st.title("Strengthening Guardrails")
-    #st.markdown("*The model powering the **Compliance Layer** underpinned by an open research dataset*")
-
-    tab1, tab5 = st.tabs([
-        "Overview", "License"
-    ])
-
     with tab1:
-        what_is_omniguard()
-        #why_omniguard()
-        #core_capabilities()
-        developer_prompt()
-        implementation_scenarios()
-        findings()
-        known_flaws()
-        #bounty()
+        introduction()
+        core_concepts()
+        findings_and_flaws()
+        conclusion()
 
+    with tab2:
+        system_prompt_details()
+        technical_details()
 
-   # with tab3:
-        #render_dataset()
-        #using_this_dataset()
+    with tab3:
+        render_dataset_info()
+        using_this_dataset()
 
-    #with tab4:
-        #how_to_contribute()
-        #support_the_omniguard_project()
-
-    with tab5:
+    with tab4:
         render_mit_license()
-    with st.sidebar:
-        #show_alpha_banner()
-        end_note()
-        st.markdown("---")
-        #Auth()
+        support_project()
+
+
 
 
 if __name__ == "__main__":
