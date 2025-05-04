@@ -140,13 +140,12 @@ def setup_sidebar(session_state: Dict[str, Any], reset_callback: ResetCallback) 
             st.rerun()
 
         st.divider()
-        st.caption("Need Help? Message [Brian](https://x.com/brianbellx)")
+        st.caption("Need Help? Message [Brian](https://x.com/brianbellx) with your conversation ID:")
 
         st.caption(
             f"""
-            Conversation ID:
             ```
-            {conversation_id} | {turn_number}
+            {conversation_id}
             ```
             """
         )
