@@ -17,27 +17,21 @@ class SessionDefaults:
     """Default values for session state initialization."""
 
     messages: list = None
-    base_conversation_id: str = None
-    turn_number: int = 0
     conversation_id: str = None
     guardrails_input_context: Optional[str] = None
     guardrails_output_message: Optional[str] = None
-    guardrails_raw_api_response: Optional[dict] = None
     agent_messages: Optional[list] = None
-    guardrails_system_prompt: str = None
     agent_system_prompt: str = None
     conversation_context: Optional[str] = None
-    schema_violation: bool = False
-    schema_violation_context: Optional[str] = None
     compliant: Optional[bool] = None
     action: Optional[str] = None
+    guardrail_flags: dict = None # Added for stateful flags
 
     def __post_init__(self):
         self.messages = []
-        self.base_conversation_id = str(uuid.uuid4())
-        self.conversation_id = f"{self.base_conversation_id}-{self.turn_number}"
-        self.guardrails_system_prompt = guardrails_system_prompt
+        self.conversation_id = str(uuid.uuid4()) + "-0"
         self.agent_system_prompt = agent_system_prompt
+        self.guardrail_flags = {} # Initialize flags
 
 
 def ensure_session_state(func: Callable):
@@ -52,10 +46,7 @@ def ensure_session_state(func: Callable):
 
 @ensure_session_state
 def generate_conversation_id(turn_number: int = 0) -> str:
-    if "base_conversation_id" not in st.session_state:
-        st.session_state.base_conversation_id = str(uuid.uuid4())
-        st.session_state.turn_number = 0
-    return f"{st.session_state.base_conversation_id}-{turn_number}"
+    return str(uuid.uuid4()) + f"-{turn_number}"
 
 
 @ensure_session_state
@@ -82,14 +73,8 @@ def init_chat_session_state(update_conversation_context: Callable) -> None:
         st.session_state.conversation_context = format_conversation_context(initial_conversation)
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    if "turn_number" not in st.session_state:
-        st.session_state.turn_number = 0
-    if "base_conversation_id" not in st.session_state:
-        st.session_state.base_conversation_id = str(uuid.uuid4())
     if "conversation_id" not in st.session_state:
-        st.session_state.conversation_id = (
-            f"{st.session_state.base_conversation_id}-{st.session_state.turn_number}"
-        )
+        st.session_state.conversation_id = str(uuid.uuid4()) + "-0"
 
 
 # *** CONVERSATION UTILITIES ***

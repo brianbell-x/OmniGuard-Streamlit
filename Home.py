@@ -40,6 +40,14 @@ def introduction() -> None:
 
             This approach ensures that **no single failure can result in unsafe output**: every message is checked, and any error in the guardrail logic results in a safe refusal rather than a silent pass-through.
 
+            **Recent Enhancements (Balancing Safety & Usability):**
+            To further strengthen the guardrails while minimizing unnecessary refusals (false positives), several enhancements have been implemented in the guardrail's instructions and logic:
+            - **Dynamic Context Scope:** The guardrail now uses a shorter context window when checking for immediate harms (like hate speech or illegal acts) but maintains a longer memory when looking for multi-step adversarial attacks (like prompt injection attempts spread across several turns). This prevents distant, unrelated past violations from causing refusals for current benign messages.
+            - **Recovery Logic:** After a refusal, if the conversation clearly shifts to a compliant topic for a few turns, the guardrail is instructed to reduce its suspicion level, allowing the conversation to recover more naturally.
+            - **Stateful Flags:** The system now tracks potentially suspicious (but not immediately violating) user actions (like initiating roleplay or attempting overrides) using temporary flags. These flags provide targeted context to the guardrail for specific attack detection rules without causing persistent general defensiveness, as they expire after a few turns.
+
+            These refinements aim to create a more nuanced and adaptive guardrail system that is both robust against attacks and less likely to impede safe, productive conversations.
+
             > **Note:** This method increases robustness and transparency, but also adds latency and complexity. It is not a complete AI safety solution, but a strong step toward reliable compliance enforcement.
             """
         )
@@ -162,6 +170,26 @@ def render_open_dataset() -> None:
             """
             All interactions processed through the **Chat** page—including user inputs, agent responses, and guardrails check results—are logged to a publicly accessible Supabase database. This dataset is intended to facilitate research and development in LLM safety and guardrailing.
 
+            **Database Table Definition:**
+
+            ```sql
+            create table public.guardrail_interactions (
+              conversation_id text not null,
+              created_at timestamp with time zone not null default now(),
+              check_type public.guardrail_check_type not null,
+              input_list jsonb null,
+              response_object jsonb null,
+              compliant boolean null,
+              action_taken text null,
+              rules_violated text[] null,
+              is_flagged boolean null default false,
+              user_comment text null,
+              feedback_type text null,
+              schema_validation_error boolean null default false,
+              constraint guardrail_interactions_unique_check unique (conversation_id, check_type)
+            ) TABLESPACE pg_default;
+            ```
+
             **Applications:**
             - Train custom compliance models or fine-tune LLMs to identify harmful content, prompt injections, or policy violations.
             - Analyze prompts and responses flagged as non-compliant to understand attack vectors and improve guardrails.
@@ -177,45 +205,46 @@ def render_open_dataset() -> None:
         try:
             total_count = (
                 supabase.table("guardrail_interactions")
-                .select("id", count="exact")
+                .select("conversation_id", count="exact")
                 .execute()
                 .count
             )
             compliant_count = (
                 supabase.table("guardrail_interactions")
-                .select("id", count="exact")
+                .select("conversation_id", count="exact")
                 .eq("compliant", True)
                 .execute()
                 .count
             )
             noncompliant_count = (
                 supabase.table("guardrail_interactions")
-                .select("id", count="exact")
+                .select("conversation_id", count="exact")
                 .eq("compliant", False)
                 .execute()
                 .count
             )
             flagged_count = (
                 supabase.table("guardrail_interactions")
-                .select("id", count="exact")
+                .select("conversation_id", count="exact")
                 .eq("is_flagged", True)
                 .execute()
                 .count
             )
-            # Distinct conversations (efficient: only ids)
+            # Total Interactions: total number of rows in the table
+            # Distinct Conversations: number of unique conversation_id values
             distinct_convos = (
                 supabase.table("guardrail_interactions")
-                .select("base_conversation_id", count="exact")
+                .select("conversation_id")
                 .execute()
             )
-            unique_convos = len({row["base_conversation_id"] for row in distinct_convos.data}) if distinct_convos.data else 0
+            unique_convos = len({row["conversation_id"] for row in distinct_convos.data}) if distinct_convos.data else 0
 
             stats_data = {
-                "Total Interactions": total_count,
+                "Total Interactions": total_count,  # total rows in table
                 "Compliant": compliant_count,
                 "Non-Compliant": noncompliant_count,
                 "Flagged": flagged_count,
-                "Distinct Conversations": unique_convos,
+                "Distinct Conversations": unique_convos,  # unique conversation_id values
             }
             st.markdown("**Dataset Statistics:**")
             st.table(stats_data)

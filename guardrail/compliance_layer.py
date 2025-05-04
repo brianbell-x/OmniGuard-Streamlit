@@ -1,4 +1,5 @@
 import logging
+import streamlit as st # Added to access session state for flags
 from pydantic import BaseModel, ValidationError
 from typing import Literal, List, Dict, Any, Tuple
 from components.api_client import openai_responses_create
@@ -25,8 +26,19 @@ class SafetyResult(BaseModel):
     response: ResponseObj | None = None
 
 def guardrails_check(conversation_xml: str) -> Tuple[list, dict, SafetyResult]:
+    # --- Inject Stateful Flags ---
+    active_flags = st.session_state.get("guardrail_flags", {})
+    flags_string = ""
+    if active_flags:
+        flags_list = [f"- {flag} (set turn {turn})" for flag, turn in active_flags.items()]
+        flags_string = "\n\n**Active Context Flags:**\n" + "\n".join(flags_list)
+        logger.debug(f"Injecting flags into guardrail prompt: {flags_string}")
+
+    modified_system_prompt = guardrails_system_prompt + flags_string
+    # --- End Flag Injection ---
+
     input_messages = [
-        {"role": "developer", "content": [{"type": "input_text", "text": guardrails_system_prompt}]},
+        {"role": "developer", "content": [{"type": "input_text", "text": modified_system_prompt}]}, # Use modified prompt
         {"role": "user", "content": [{"type": "input_text", "text": conversation_xml}]},
     ]
     raw_response = {}
@@ -63,7 +75,7 @@ def guardrails_check(conversation_xml: str) -> Tuple[list, dict, SafetyResult]:
                 compliant=False,
                 response=ResponseObj(
                     action="RefuseUser",
-                    rules_violated=["SCHEMA_VALIDATION_ERROR"],
+                    rules_violated=["schema_validation_error"],
                     RefuseUser=SCHEMA_ERROR_STATIC_REFUSAL
                 ),
             )
@@ -78,7 +90,7 @@ def guardrails_check(conversation_xml: str) -> Tuple[list, dict, SafetyResult]:
             compliant=False,
             response=ResponseObj(
                 action="RefuseUser",
-                rules_violated=["SCHEMA_VALIDATION_ERROR"],
+                rules_violated=["schema_validation_error"],
                 RefuseUser=SCHEMA_ERROR_STATIC_REFUSAL
             ),
         )

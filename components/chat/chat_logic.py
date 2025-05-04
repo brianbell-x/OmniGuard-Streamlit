@@ -38,51 +38,85 @@ def _init_supabase() -> Optional[Client]:
 supabase: Optional[Client] = _init_supabase()
 # --------------------------------------
 
+# --- Flag Setting Logic ---
+def _update_flags_from_analysis(analysis: str, turn_number: int):
+    """
+    Analyzes the guardrail analysis text and sets flags in session state
+    based on detected suspicious patterns.
+    """
+    if not analysis:
+        return
+
+    flags_to_set = {}
+    analysis_lower = analysis.lower()
+
+    # Simple keyword checks (can be expanded)
+    if "roleplay" in analysis_lower or "role play" in analysis_lower or "persona" in analysis_lower:
+        flags_to_set["potential_roleplay_attack"] = turn_number
+    if "encode" in analysis_lower or "encoding" in analysis_lower or "obfuscate" in analysis_lower or "base64" in analysis_lower:
+        flags_to_set["potential_encoding_detected"] = turn_number
+    if "override" in analysis_lower or "ignore previous" in analysis_lower or "ignore rules" in analysis_lower or "ignore guidelines" in analysis_lower:
+        flags_to_set["potential_override_attempt"] = turn_number
+    # Add more checks as needed...
+
+    if flags_to_set:
+        if "guardrail_flags" not in st.session_state:
+            st.session_state.guardrail_flags = {}
+        st.session_state.guardrail_flags.update(flags_to_set)
+        logger.debug(f"Set guardrail flags: {flags_to_set} at turn {turn_number}")
+
+# --- End Flag Setting ---
+
+
 def log_guardrail_interaction(
-    base_conversation_id: str,
-    turn_number: int,
+    conversation_id: str,
     check_type: str,  # 'user_input' or 'agent_response'
     raw_input: Optional[List[Dict[str, Any]]],
     raw_output: Optional[Dict[str, Any]],
     parsed_result: Optional[SafetyResult]
-) -> Optional[int]:
+) -> Optional[str]:
     """
-    Logs the details of a guardrail check to the Supabase database and returns the inserted row's ID.
+    Logs the details of a guardrail check to the Supabase database and returns the inserted row's conversation_id.
     """
     if not supabase:
         logger.warning("Supabase client not initialized. Skipping log.")
         return None
 
-    if not all([base_conversation_id, isinstance(turn_number, int), check_type, raw_output, parsed_result]):
-        logger.warning(f"Missing essential data for logging {base_conversation_id}-{turn_number}-{check_type}. Skipping log.")
+    if not all([conversation_id, check_type, raw_output, parsed_result]):
+        logger.warning(f"Missing essential data for logging {conversation_id}-{check_type}. Skipping log.")
         return None
 
     try:
+        rules_violated = getattr(parsed_result.response, "rules_violated", None) if parsed_result.response else None
+        schema_validation_error_flag = (
+            True if rules_violated and "schema_validation_error" in rules_violated else None
+        )
+
         data_to_insert = {
-            "base_conversation_id": base_conversation_id,
-            "turn_number": turn_number,
+            "conversation_id": conversation_id,
             "check_type": check_type,
-            "raw_openai_input": raw_input,
-            "raw_openai_output": raw_output,
+            "input_list": raw_input,
+            "response_object": raw_output,
             "compliant": parsed_result.compliant,
             "action_taken": getattr(parsed_result.response, "action", None) if parsed_result.response else None,
-            "rules_violated": getattr(parsed_result.response, "rules_violated", None) if parsed_result.response else None,
+            "rules_violated": rules_violated,
             "is_flagged": False,
             "feedback_type": None,
             "user_comment": None,
+            "schema_validation_error": schema_validation_error_flag,
         }
 
         response = supabase.table("guardrail_interactions").insert(data_to_insert).execute()
-        if response.data and len(response.data) > 0 and 'id' in response.data[0]:
-            interaction_id = response.data[0]['id']
-            logger.debug(f"Logged guardrail interaction {interaction_id} for {base_conversation_id}-{turn_number}-{check_type}.")
+        if response.data and len(response.data) > 0 and 'conversation_id' in response.data[0]:
+            interaction_id = response.data[0]['conversation_id']
+            logger.debug(f"Logged guardrail interaction {interaction_id} for {conversation_id}-{check_type}.")
             return interaction_id
         else:
-            logger.warning(f"Could not get interaction ID directly for {base_conversation_id}-{turn_number}-{check_type}.")
+            logger.warning(f"Could not get interaction ID directly for {conversation_id}-{check_type}.")
             return None
 
     except Exception as e:
-        logger.error(f"Error logging guardrail interaction to Supabase for {base_conversation_id}-{turn_number}-{check_type}: {e}", exc_info=True)
+        logger.error(f"Error logging guardrail interaction to Supabase for {conversation_id}-{check_type}: {e}", exc_info=True)
         return None
 
 # --- AGENT SERVICE ---
@@ -107,10 +141,12 @@ def fetch_agent_response() -> str:
 
     agent_messages = [{"role": "system", "content": [{"type": "input_text", "text": main_prompt}]}]
     for message in st.session_state.messages:
+        # Determine content type based on role for API compatibility
+        content_type = "output_text" if message["role"] == "assistant" else "input_text"
         agent_messages.append(
             {
                 "role": message["role"],
-                "content": [{"type": "input_text", "text": message["content"]}],
+                "content": [{"type": content_type, "text": message["content"]}],
             }
         )
     st.session_state.agent_messages = agent_messages
@@ -119,6 +155,7 @@ def fetch_agent_response() -> str:
         model=st.session_state.get("selected_agent_model", settings.agent_model),
         input_messages=agent_messages,
         text={"format": {"type": "text"}},
+        reasoning={}, # Explicitly pass empty object for reasoning
         temperature=0.6,
         max_output_tokens=4096,
     )
@@ -143,8 +180,8 @@ def _call_and_log_guardrails(context_xml: str, check_type: str) -> Tuple[SafetyR
     session.guardrails_output_message = safety_result.model_dump_json()
 
     interaction_id = log_guardrail_interaction(
-        base_conversation_id=session.get("base_conversation_id", ""),
-        turn_number=session.get("turn_number", -1),
+        conversation_id=session.get("conversation_id", ""), # Changed base_conversation_id to conversation_id
+        # turn_number=session.get("turn_number", -1), # Removed turn_number as it's not a parameter
         check_type=check_type,
         raw_input=raw_input,
         raw_output=raw_output,
@@ -178,7 +215,24 @@ def process_user_message(
         return
 
     user_input = user_input.strip()
-    session_state["turn_number"] += 1
+
+    # --- Stateful Flag Expiration Logic ---
+    FLAG_EXPIRATION_TURNS = 5 # Define how many turns a flag persists
+    current_turn = session_state.get("turn_number", 0) # Assuming turn_number is tracked
+    if "guardrail_flags" in session_state:
+        flags_to_remove = [
+            flag_name for flag_name, set_turn in session_state.guardrail_flags.items()
+            if current_turn - set_turn >= FLAG_EXPIRATION_TURNS
+        ]
+        if flags_to_remove:
+            logger.debug(f"Expiring guardrail flags: {flags_to_remove}")
+            for flag_name in flags_to_remove:
+                del session_state.guardrail_flags[flag_name]
+    # --- End Flag Expiration ---
+
+    # Increment turn number (ensure this happens consistently)
+    session_state["turn_number"] = current_turn + 1
+
     session_state["conversation_id"] = generate_conversation_id(session_state["turn_number"])
     session_state["messages"].append({"role": "user", "content": user_input})
     update_conversation_context()
@@ -192,10 +246,13 @@ def process_user_message(
             temp_conversation = build_conversation_json(session_state["messages"])
             temp_context_xml = format_conversation_context(temp_conversation)
             user_safety_result, user_interaction_id = _call_and_log_guardrails(temp_context_xml, "user_input")
+            # Set flags based on user input check analysis
+            _update_flags_from_analysis(user_safety_result.analysis, session_state["turn_number"])
+
 
         # Step 2: Process User Check Result
         rules_violated = getattr(user_safety_result.response, "rules_violated", []) if user_safety_result.response else []
-        if "SCHEMA_VALIDATION_ERROR" in rules_violated:
+        if "schema_validation_error" in rules_violated:
             logger.warning("User input safety check failed schema validation.")
             assistant_response_to_display = getattr(user_safety_result.response, "RefuseUser", SCHEMA_ERROR_STATIC_REFUSAL)
             final_assistant_message_role = "assistant"
@@ -237,10 +294,12 @@ def process_user_message(
         agent_check_context_xml = format_conversation_context(agent_check_conversation)
         with st.spinner("Compliance Layer (Agent)", show_time=True):
             agent_safety_result, agent_interaction_id = _call_and_log_guardrails(agent_check_context_xml, "agent_response")
+            # Set flags based on agent response check analysis
+            _update_flags_from_analysis(agent_safety_result.analysis, session_state["turn_number"])
 
         # Step 5: Process Agent Check Result
         agent_rules_violated = getattr(agent_safety_result.response, "rules_violated", []) if agent_safety_result.response else []
-        if "SCHEMA_VALIDATION_ERROR" in agent_rules_violated:
+        if "schema_validation_error" in agent_rules_violated:
             logger.warning("Agent response safety check failed schema validation.")
             assistant_response_to_display = getattr(agent_safety_result.response, "RefuseAssistant", None) or getattr(agent_safety_result.response, "RefuseUser", SCHEMA_ERROR_STATIC_REFUSAL)
             session_state["compliant"] = False
@@ -277,8 +336,7 @@ def process_user_message(
             response=None,
         )
         log_guardrail_interaction(
-            base_conversation_id=session_state.get("base_conversation_id", "error_id"),
-            turn_number=session_state.get("turn_number", -1),
+            conversation_id=session_state.get("conversation_id", "error"),
             check_type='user_input_error',
             raw_input=None,
             raw_output=None,
@@ -293,7 +351,3 @@ def process_user_message(
             {"role": "assistant", "content": "I'm sorry, I can't process that request due to a system error."}
         )
         update_conversation_context()
-
-# Remove legacy functions (now integrated into process_user_message and _call_and_log_guardrails)
-# - call_guardrails_check
-# - process_guardrails_result
