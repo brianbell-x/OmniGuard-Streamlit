@@ -21,8 +21,7 @@ def openai_responses_create(
         params["temperature"] = temperature
         params["top_p"] = top_p
     else:
-        # For the safety model, set reasoning effort to "low"
-        params["reasoning"] = {"effort": "low"}
+        params["reasoning"] = {"effort": "low", "summary": "detailed"}
     if text is not None:
         params["text"] = text
     params.update(kwargs)
