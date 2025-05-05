@@ -6,7 +6,7 @@ def openai_responses_create(
     input_messages: list[dict],
     text: dict = None,
     temperature: float = 1.0,
-    max_output_tokens: int = 4096,
+    max_output_tokens: int = 100000,
     top_p: float = 1.0,
     **kwargs
 ) -> dict:
